@@ -1,10 +1,12 @@
 <!DOCTYPE html>
 <html lang="en" xmlns="http://www.w3.org/1999/xhtml" xmlns:th="http://www.thymeleaf.org">
 
-<head th:insert="fragments/head :: head"> </head>
+<head th:insert="fragments/head :: head">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+</head>
 
 <body class="index-page">
-<div th:replace="fragments/navbar:: navbar"></div>
+<div th:replace="fragments/navbar :: navbar"></div>
 
 <div class="wrapper">
     <div class="section section-shaped">
@@ -30,7 +32,6 @@
                                         th:text="${answer.dateSubmitted}"></small></span>
                             </h6>
                             <h6 class="card-title mb-0" th:text="${answer.body}"></h6>
-
                             <div class="helpful-icons mt-2">
                                 <form method="post" action="/mark-answer" class="d-inline">
                                     <input type="hidden" name="answerId" th:value="${answer.id}" />
@@ -53,7 +54,7 @@
                     </div>
                 </div>
                 <div class="post-answer mt-6"
-                     th:hidden="${!userSession.isLoggedIn() || !userSession.getUser().isAdmin()}">
+                     th:hidden="${!userSession.isLoggedIn() || !userSession.getUser().getEmail().endsWith('@hse.ie')}">
                     <form method="post" action="/question" role="form">
                         <h4>Post an answer</h4>
                         <div class="form-group mt-3">

@@ -32,6 +32,9 @@ public class ForumAnswer {
     @ManyToOne
     private User admin;
 
+    private int helpfulCount;
+    private int notHelpfulCount;
+
     public ForumAnswer() {
     }
 
@@ -78,5 +81,21 @@ public class ForumAnswer {
 
     public void setAdmin(User admin) {
         this.admin = admin;
+    }
+
+    public int getHelpfulCount() {
+        return helpfulCount;
+    }
+
+    public void setHelpfulCount(int helpfulCount) {
+        this.helpfulCount = helpfulCount;
+    }
+
+    public int getNotHelpfulCount() {
+        return notHelpfulCount;
+    }
+
+    public void setNotHelpfulCount(int notHelpfulCount) {
+        this.notHelpfulCount = notHelpfulCount;
     }
 }

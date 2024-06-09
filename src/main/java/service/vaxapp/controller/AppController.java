@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Controller;
@@ -22,29 +23,45 @@ import service.vaxapp.UserSession;
 import service.vaxapp.model.*;
 import service.vaxapp.repository.*;
 
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 @Controller
 public class AppController {
+
+    private static final Logger logger = LoggerFactory.getLogger(AppController.class);
+
     @Autowired
     private AppointmentRepository appointmentRepository;
+
     @Autowired
     private ForumAnswerRepository forumAnswerRepository;
+
     @Autowired
     private ForumQuestionRepository forumQuestionRepository;
+
     @Autowired
     private UserRepository userRepository;
+
     @Autowired
     private VaccineCentreRepository vaccineCentreRepository;
+
     @Autowired
     private VaccineRepository vaccineRepository;
+
     @Autowired
     private AppointmentSlotRepository appointmentSlotRepository;
 
     @Autowired
     private UserSession userSession;
+
+    @Autowired
+    private UserAnswerFeedbackRepository userAnswerFeedbackRepository;
 
     @GetMapping("/")
     public String index(Model model) {
@@ -53,8 +70,8 @@ public class AppController {
         // sort time slots by center and date
         Collections.sort(appSlots, new Comparator<AppointmentSlot>() {
             public int compare(AppointmentSlot o1, AppointmentSlot o2) {
-                if (o1.getVaccineCentre().getName() == o2.getVaccineCentre().getName()) {
-                    if (o1.getDate() == o2.getDate())
+                if (o1.getVaccineCentre().getName().equals(o2.getVaccineCentre().getName())) {
+                    if (o1.getDate().equals(o2.getDate()))
                         return o1.getStartTime().compareTo(o2.getStartTime());
                     return o1.getDate().compareTo(o2.getDate());
                 }
@@ -70,7 +87,7 @@ public class AppController {
 
     @PostMapping(value = "/make-appointment")
     public String makeAppointment(@RequestParam Map<String, String> body, Model model,
-            RedirectAttributes redirectAttributes) {
+                                  RedirectAttributes redirectAttributes) {
         if (!userSession.isLoggedIn()) {
             redirectAttributes.addFlashAttribute("error", "You must be logged in to make an appointment.");
             return "redirect:/login";
@@ -105,43 +122,133 @@ public class AppController {
 
     @GetMapping("/stats")
     public String statistics(Model model) {
-        getStats(model, "irish");
-        return "stats.html";
+        // Populate the model with statistics for the default country (Irish in this case)
+        getStats(model, "Irish");
+        return "stats";
     }
 
-    private void getStats(Model model, String country) {
-        model.addAttribute("userSession", userSession);
-        model.addAttribute("totalDoses", vaccineRepository.count());
-        List<User> users = vaccineRepository.findAll().stream().map(Vaccine::getUser).collect(Collectors.toList());
 
-        model.addAttribute("dosesByNationality",
-                users.stream().distinct().filter(x -> x.getNationality().equalsIgnoreCase(country)).count());
+    private void getStats(Model model, String country) {
+        // Add the user session to the model
+        model.addAttribute("userSession", userSession);
+
+        // Add the total number of doses administered to the model
+        model.addAttribute("totalDoses", vaccineRepository.count());
+
+        // Retrieve all users_vaccinated who have been vaccinated
+        List<User> users_vaccinated = vaccineRepository.findAll().stream().map(Vaccine::getUser).collect(Collectors.toList());
+        
+        long dosesByNationality = users_vaccinated.stream().distinct().filter(x -> x.getNationality().equalsIgnoreCase(country)).count();
+        model.addAttribute("dosesByNationality", dosesByNationality);
         model.addAttribute("country", country);
 
-        long total = users.size();
-        long male = users.stream().filter(x -> x.getGender().equalsIgnoreCase("male")).count();
+        // Add the number of doses by nationality to the model
+       // model.addAttribute("dosesByNationality",
+        //        users_vaccinated.stream().distinct().filter(x -> x.getNationality().equalsIgnoreCase(country)).count());
+        //model.addAttribute("country", country);
+
+        // Get unique users based on the vaccinations
+        List<User> users_vaccinated_unique = vaccineRepository.findAll().stream()
+                .map(Vaccine::getUser)
+                .distinct()
+                .collect(Collectors.toList());
+        // Calculate the total number of users_vaccinated
+        long total = users_vaccinated_unique.size();
+
+        // Calculate the number of vaccinated males and females
+        long male = users_vaccinated_unique.stream().filter(x -> x.getGender().equalsIgnoreCase("male")).count();
         long female = total - male;
-        Map<Integer, Double> ageRanges = new TreeMap<>();
 
-        for (AtomicInteger i = new AtomicInteger(1); i.get() <= 8; i.incrementAndGet()) {
-            long count = users.stream().filter(x -> x.getAge() / 10 == i.get()).count();
-            ageRanges.put(i.get() * 10, count == 0 ? 0.0 : count / total * 100);
-        }
+        // Create a map to store age ranges and their corresponding percentages
+        Map<String, Double> ageRanges = new TreeMap<>();
+        ageRanges.put("18-25", calculateAgeRangePercentage("18-25", total, users_vaccinated_unique));
+        ageRanges.put("26-35", calculateAgeRangePercentage("26-35", total, users_vaccinated_unique));
+        ageRanges.put("36-45", calculateAgeRangePercentage("36-45", total, users_vaccinated_unique));
+        ageRanges.put("46-55", calculateAgeRangePercentage("46-55", total, users_vaccinated_unique));
+        ageRanges.put("56-65", calculateAgeRangePercentage("56-65", total, users_vaccinated_unique));
+        ageRanges.put("65+", calculateAgeRangePercentage("65+", total, users_vaccinated_unique));
 
+        // Add the calculated statistics to the model
         model.addAttribute("agerange", ageRanges);
         model.addAttribute("maleDosePercent", male * 100.0 / (double) total);
         model.addAttribute("femaleDosePercent", female * 100.0 / (double) total);
+
+        logger.info("Total Doses: {}", vaccineRepository.count());
+        logger.info("Doses by Nationality: {}", dosesByNationality);
+        logger.info("Male Percentage: {}", male * 100.0 / (double) total);
+        logger.info("Female Percentage: {}", female * 100.0 / (double) total);
+        logger.info("Age Ranges: {}", ageRanges);
+
+        // Prepare data for charts
+        prepareChartData(model, users_vaccinated_unique);
+    }
+
+    private void prepareChartData(Model model, List<User> users) {
+        // Calculate percentages of males and females
+        long total = users.size();
+        long male = users.stream().filter(x -> x.getGender().equalsIgnoreCase("male")).count();
+        long female = total - male;
+
+        model.addAttribute("maleDosePercent", male * 100.0 / (double) total);
+        model.addAttribute("femaleDosePercent", female * 100.0 / (double) total);
+
+        // Calculate age distribution
+        List<String> ageRangeLabels = List.of("18-25", "26-35", "36-45", "46-55", "56-65", "65+");
+        List<Double> ageRangeValues = ageRangeLabels.stream()
+                .map(range -> calculateAgeRangePercentage(range, total, users))
+                .collect(Collectors.toList());
+
+        model.addAttribute("ageRangeLabels", ageRangeLabels);
+        model.addAttribute("ageRangeValues", ageRangeValues);
+
+        // Calculate nationality distribution
+        List<String> nationalityLabels = users.stream()
+                .map(User::getNationality)
+                .distinct()
+                .collect(Collectors.toList());
+        List<Long> nationalityValues = nationalityLabels.stream()
+                .map(nationality -> (long) users.stream().filter(user -> user.getNationality().equalsIgnoreCase(nationality)).count())
+                .collect(Collectors.toList());
+
+        model.addAttribute("nationalityLabels", nationalityLabels);
+        model.addAttribute("nationalityValues", nationalityValues);
+    }
+
+    private double calculateAgeRangePercentage(String range, long total, List<User> users) {
+        int minAge;
+        int maxAge;
+        if (range.contains("+")) {
+            minAge = Integer.parseInt(range.split("\\+")[0]);
+            maxAge = Integer.MAX_VALUE;
+        } else {
+            minAge = Integer.parseInt(range.split("-")[0]);
+            maxAge = Integer.parseInt(range.split("-")[1]);
+        }
+
+        long count = users.stream()
+                .filter(user -> {
+                    int age = calculateAge(user.getDateOfBirth());
+                    return age >= minAge && age <= maxAge;
+                })
+                .count();
+        //return (double) count * 100 / total;   //Percentage
+        return (int) count;
+    }
+
+    private int calculateAge(String dateOfBirth) {
+        LocalDate dob = LocalDate.parse(dateOfBirth, DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+        return Period.between(dob, LocalDate.now()).getYears();
     }
 
     @PostMapping("/stats")
     public String statistics(Model model, @RequestParam("nationality") String country) {
+        // Populate the model with statistics for the selected country
         getStats(model, country);
-        return "stats.html";
+        return "stats";
     }
 
-    /**
-     * User Area
-     */
+
+    /*******User Area**********/
     @GetMapping("/login")
     public String login(Model model) {
         model.addAttribute("userSession", userSession);
@@ -150,8 +257,8 @@ public class AppController {
 
     @PostMapping("/login")
     public String login(@RequestParam("email") String email, @RequestParam("pps") String pps,
-            RedirectAttributes redirectAttributes) {
-        // make sure the user is found in db by PPS and email
+                        RedirectAttributes redirectAttributes) {
+        // Ensure the user is found in the database by PPS and email
         User user = userRepository.findByCredentials(email, pps);
         if (user == null) {
             redirectAttributes.addFlashAttribute("error", "Wrong credentials.");
@@ -170,6 +277,7 @@ public class AppController {
 
     @RequestMapping(value = "/register", method = RequestMethod.POST, consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
     public String register(User user, RedirectAttributes redirectAttributes) {
+        // Validate user input
         if (user.getDateOfBirth().isEmpty() || user.getEmail().isEmpty() || user.getAddress().isEmpty()
                 || user.getFullName().isEmpty() || user.getGender().isEmpty() || user.getNationality().isEmpty()
                 || user.getPhoneNumber().isEmpty() || user.getPPS().isEmpty()) {
@@ -202,7 +310,7 @@ public class AppController {
 
     @GetMapping("/forum")
     public String forum(Model model) {
-        // Retrieve all questions and answers from database
+        // Retrieve all questions and answers from the database
         List<ForumQuestion> questions = forumQuestionRepository.findAll();
         model.addAttribute("questions", questions);
         model.addAttribute("userSession", userSession);
@@ -223,36 +331,36 @@ public class AppController {
 
     @PostMapping("/ask-a-question")
     public String askAQuestion(@RequestParam String title, @RequestParam String details, Model model,
-            RedirectAttributes redirectAttributes) {
+                               RedirectAttributes redirectAttributes) {
         // If user is not logged in or is admin
         if (!userSession.isLoggedIn() || userSession.getUser().isAdmin()) {
             redirectAttributes.addFlashAttribute("error", "Users must be logged in to ask questions.");
             return "redirect:/forum";
         }
 
-        // Create new question entry in db
+        // Create new question entry in the database
         ForumQuestion newQuestion = new ForumQuestion(title, details, getDateSubmitted(), userSession.getUser());
 
-        // Add question to database
+        // Add question to the database
         forumQuestionRepository.save(newQuestion);
 
         redirectAttributes.addFlashAttribute("success", "The question was successfully submitted.");
 
-        // Redirect to new question page
+        // Redirect to the new question page
         return "redirect:/question?id=" + newQuestion.getId();
     }
 
     @PostMapping("/question")
     public String answerQuestion(@RequestParam String body, @RequestParam String id, Model model,
-            RedirectAttributes redirectAttributes) {
-        // Retrieving question
+                                 RedirectAttributes redirectAttributes) {
+        // Retrieve the question
         try {
             Integer questionId = Integer.parseInt(id);
             Optional<ForumQuestion> question = forumQuestionRepository.findById(questionId);
             if (question.isPresent()) {
                 // If user is admin
                 if (userSession.isLoggedIn() && userSession.getUser() != null && userSession.getUser().isAdmin()) {
-                    // Create new answer entry in db
+                    // Create a new answer entry in the database
                     ForumAnswer newAnswer = new ForumAnswer(body, getDateSubmitted());
                     // Save forum question and answer
                     newAnswer.setAdmin(userSession.getUser());
@@ -262,12 +370,12 @@ public class AppController {
                     forumQuestionRepository.save(question.get());
 
                     redirectAttributes.addFlashAttribute("success", "The answer was successfully submitted.");
-                    // Redirect to updated question page
+                    // Redirect to the updated question page
                     return "redirect:/question?id=" + question.get().getId();
                 } else {
                     redirectAttributes.addFlashAttribute("error",
                             "Only admins may answer questions. If you are an admin, please log in.");
-                    // Redirect to unchanged same question page
+                    // Redirect to the unchanged same question page
                     return "redirect:/question?id=" + question.get().getId();
                 }
             }
@@ -277,6 +385,55 @@ public class AppController {
         }
         return "redirect:/forum";
     }
+
+
+
+    @PostMapping("/mark-answer")
+    public String markAnswer(@RequestParam("answerId") Integer answerId, @RequestParam("isHelpful") Boolean isHelpful,
+                             RedirectAttributes redirectAttributes) {
+        if (!userSession.isLoggedIn()) {
+            redirectAttributes.addFlashAttribute("error", "You must be logged in to give feedback.");
+            return "redirect:/question?id=" + answerId;
+        }
+
+        Optional<ForumAnswer> optionalAnswer = forumAnswerRepository.findById(answerId);
+        if (optionalAnswer.isPresent()) {
+            ForumAnswer answer = optionalAnswer.get();
+            User user = userSession.getUser();
+
+            Optional<UserAnswerFeedback> existingFeedback = userAnswerFeedbackRepository.findByUserAndAnswer(user, answer);
+            if (existingFeedback.isPresent()) {
+                // User already gave feedback, remove it
+                userAnswerFeedbackRepository.delete(existingFeedback.get());
+                if (existingFeedback.get().getFeedbackType().equals("helpful")) {
+                    answer.setHelpfulCount(answer.getHelpfulCount() - 1);
+                } else {
+                    answer.setNotHelpfulCount(answer.getNotHelpfulCount() - 1);
+                }
+            } else {
+                // Add new feedback
+                UserAnswerFeedback feedback = new UserAnswerFeedback();
+                feedback.setUser(user);
+                feedback.setAnswer(answer);
+                feedback.setFeedbackType(isHelpful ? "helpful" : "not_helpful");
+
+                userAnswerFeedbackRepository.save(feedback);
+                if (isHelpful) {
+                    answer.setHelpfulCount(answer.getHelpfulCount() + 1);
+                } else {
+                    answer.setNotHelpfulCount(answer.getNotHelpfulCount() + 1);
+                }
+            }
+
+            forumAnswerRepository.save(answer);
+            redirectAttributes.addFlashAttribute("success", "Your feedback has been recorded.");
+        } else {
+            redirectAttributes.addFlashAttribute("error", "Answer not found.");
+        }
+        return "redirect:/question?id=" + answerId;
+    }
+
+
 
     @GetMapping("/profile")
     public String profile(Model model, RedirectAttributes redirectAttributes) {
@@ -320,7 +477,7 @@ public class AppController {
             List<Vaccine> vaxes = vaccineRepository.findByUser(user.get().getId());
 
             if (userSession.isLoggedIn() && userSession.getUser().isAdmin()) {
-                // admins can see everybody's appointments
+                // Admins can see everybody's appointments
                 List<Appointment> apps = appointmentRepository.findByUser(user.get().getId());
                 Collections.reverse(apps);
                 Collections.reverse(vaxes);
@@ -349,7 +506,7 @@ public class AppController {
         Integer id = Integer.valueOf(stringId);
         Appointment app = appointmentRepository.findById(id).get();
 
-        if (!userSession.getUser().isAdmin() && userSession.getUser().getId() != app.getUser().getId()) {
+        if (!userSession.getUser().isAdmin() && !userSession.getUser().getId().equals(app.getUser().getId())) {
             // Hacker detected! You can't cancel someone else's appointment!
             return "404";
         }
@@ -362,7 +519,7 @@ public class AppController {
 
         redirectAttributes.addFlashAttribute("success", "The appointment was successfully cancelled.");
 
-        if (app.getUser().getId() != userSession.getUser().getId()) {
+        if (!app.getUser().getId().equals(userSession.getUser().getId())) {
             return "redirect:/profile/" + app.getUser().getId();
         }
 
@@ -371,7 +528,7 @@ public class AppController {
 
     @GetMapping("/question")
     public String getQuestionById(@RequestParam(name = "id") Integer id, Model model,
-            RedirectAttributes redirectAttributes) {
+                                  RedirectAttributes redirectAttributes) {
         // Retrieve question
         Optional<ForumQuestion> question = forumQuestionRepository.findById(id);
         if (question.isPresent()) {
@@ -386,9 +543,6 @@ public class AppController {
         }
     }
 
-    /**
-     * Admin area
-     */
     @GetMapping("/dashboard")
     public String dashboard(Model model) {
         if (!userSession.isLoggedIn() || !userSession.getUser().isAdmin())
@@ -413,7 +567,7 @@ public class AppController {
 
     @PostMapping(value = "/assign-vaccine")
     public String assignVaccine(@RequestParam Map<String, String> body, Model model,
-            RedirectAttributes redirectAttributes) {
+                                RedirectAttributes redirectAttributes) {
         if (!userSession.isLoggedIn() || !userSession.getUser().isAdmin()) {
             return "redirect:/login";
         }
@@ -478,7 +632,7 @@ public class AppController {
 
         redirectAttributes.addFlashAttribute("success", "The appointment was marked as complete.");
 
-        if (app.getUser().getId() != userSession.getUser().getId()) {
+        if (!app.getUser().getId().equals(userSession.getUser().getId())) {
             return "redirect:/profile/" + app.getUser().getId();
         }
 
