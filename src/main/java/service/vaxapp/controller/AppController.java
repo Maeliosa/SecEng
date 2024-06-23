@@ -1,5 +1,6 @@
 package service.vaxapp.controller;
 
+import java.text.DecimalFormat;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -63,9 +64,26 @@ public class AppController {
     @Autowired
     private UserAnswerFeedbackRepository userAnswerFeedbackRepository;
 
+    @Autowired
+    private AppointmentSlotGenerating AppointmentSlotGenerating;
+
+
+
     @GetMapping("/")
     public String index(Model model) {
-        ArrayList<AppointmentSlot> appSlots = (ArrayList<AppointmentSlot>) appointmentSlotRepository.findAll();
+        /**
+         * Generate slots if they don't exist. Initially the date and time slot was written
+         * manually into the database(appointment_slot). This was not feasible for long term. Therefore,
+         * the appointmentSlotGenerating.java provide a dynamically class to creates new slot
+         * for the next 7 days and time slot with 15 mins interval.
+         */
+        List<VaccineCentre> centres = vaccineCentreRepository.findAll();
+        for (VaccineCentre centre : centres) {
+            AppointmentSlotGenerating.generateSlotsIfNotExist(centre.getId(), 7, LocalTime.of(9, 0), LocalTime.of(17, 0), 15);
+        }
+
+        // Retrieve appointment slots starting from today's date
+        ArrayList<AppointmentSlot> appSlots = (ArrayList<AppointmentSlot>) appointmentSlotRepository.findAllByDateAfter(LocalDate.now());
 
         // sort time slots by center and date
         Collections.sort(appSlots, new Comparator<AppointmentSlot>() {
@@ -80,6 +98,7 @@ public class AppController {
             }
         });
 
+        // Add the sorted appointment slots and user session to the model
         model.addAttribute("appSlots", appSlots);
         model.addAttribute("userSession", userSession);
         return "index";
@@ -168,16 +187,28 @@ public class AppController {
         ageRanges.put("56-65", calculateAgeRangePercentage("56-65", total, users_vaccinated_unique));
         ageRanges.put("65+", calculateAgeRangePercentage("65+", total, users_vaccinated_unique));
 
+
+        // convert to .2 decimcal places for better readability
+        DecimalFormat df = new DecimalFormat("#.00");
+        double malePercentage = male * 100.0 / (double) total;
+        double femalePercentage = female * 100.0 / (double) total;
+
         // Add the calculated statistics to the model
+        //model.addAttribute("agerange", ageRanges);
+        //model.addAttribute("maleDosePercent", male * 100.0 / (double) total);
+        //model.addAttribute("femaleDosePercent", female * 100.0 / (double) total);
+
         model.addAttribute("agerange", ageRanges);
-        model.addAttribute("maleDosePercent", male * 100.0 / (double) total);
-        model.addAttribute("femaleDosePercent", female * 100.0 / (double) total);
+        model.addAttribute("maleDosePercent", df.format(malePercentage));
+        model.addAttribute("femaleDosePercent", df.format(femalePercentage));
 
         logger.info("Total Doses: {}", vaccineRepository.count());
         logger.info("Doses by Nationality: {}", dosesByNationality);
         logger.info("Male Percentage: {}", male * 100.0 / (double) total);
         logger.info("Female Percentage: {}", female * 100.0 / (double) total);
         logger.info("Age Ranges: {}", ageRanges);
+        logger.info("Male Percentage: {}", df.format(malePercentage));
+        logger.info("Female Percentage: {}", df.format(femalePercentage));
 
         // Prepare data for charts
         prepareChartData(model, users_vaccinated_unique);
@@ -189,8 +220,16 @@ public class AppController {
         long male = users.stream().filter(x -> x.getGender().equalsIgnoreCase("male")).count();
         long female = total - male;
 
-        model.addAttribute("maleDosePercent", male * 100.0 / (double) total);
-        model.addAttribute("femaleDosePercent", female * 100.0 / (double) total);
+        DecimalFormat df = new DecimalFormat("#.00");
+        double malePercentage = male * 100.0 / (double) total;
+        double femalePercentage = female * 100.0 / (double) total;
+        logger.info("Male Percentage: {}", df.format(malePercentage));
+        logger.info("Female Percentage: {}", df.format(femalePercentage));
+
+        model.addAttribute("maleDosePercent", df.format(malePercentage));
+        model.addAttribute("femaleDosePercent", df.format(femalePercentage));
+        //model.addAttribute("maleDosePercent", male * 100.0 / (double) total);
+        //model.addAttribute("femaleDosePercent", female * 100.0 / (double) total);
 
         // Calculate age distribution
         List<String> ageRangeLabels = List.of("18-25", "26-35", "36-45", "46-55", "56-65", "65+");

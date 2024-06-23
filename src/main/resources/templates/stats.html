@@ -1,10 +1,14 @@
+<!--
+references:
+https://www.chartjs.org/docs/latest/getting-started/usage.html
+https://www.npmjs.com/package/chartjs-chart-geo
 
+-->
 <!DOCTYPE html>
 <html lang="en" xmlns="http://www.w3.org/1999/xhtml" xmlns:th="http://www.thymeleaf.org">
 
 <head th:insert="fragments/head :: head">
     <title>Stats</title>
-
 </head>
 
 <body class="stats-page">
@@ -17,6 +21,7 @@
         <div class="page-header">
             <div class="container py-lg px-4">
                 <h2>Stats</h2>
+
                 <h2 th:text="${totalDoses} + ' doses have been administered'"></h2>
                 <form action="stats" method="post">
                     <select name="nationality">
@@ -219,9 +224,20 @@
                         Submit
                     </button>
                 </form>
-                <h2 th:text="${dosesByNationality} + ' ' + ${country} + ' people have been vaccinated'"></h2>
-                <h2 th:text="${maleDosePercent} + '% of vaccinated people are male'"></h2>
-                <h2 th:text="${femaleDosePercent} + '% of vaccinated people are female'"></h2>
+                        <div class="card-container">
+                            <div class="card-metric">
+                                <div class="metric" th:text="${dosesByNationality} + ' ' + ${country}"></div>
+                                <p>people have been vaccinated</p>
+                            </div>
+                            <div class="card-metric">
+                                <div class="metric" th:text="${maleDosePercent} + '%'"></div>
+                                <p>of vaccinated people are male</p>
+                            </div>
+                                <div class="card-metric">
+                                    <div class="metric"  th:text="${femaleDosePercent} + '%'"></div>
+                                    <p>of vaccinated people are female</p>
+                                </div>
+                        </div>
 
 
                 <!-- Gender Distribution Chart -->
@@ -246,9 +262,11 @@
 <footer th:insert="fragments/footer :: footer"></footer>
 
 
-
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-chart-geo@3"></script>
+
 <script th:inline="javascript">
+
     /*<![CDATA[*/
     document.addEventListener('DOMContentLoaded', function () {
     // Gender Distribution chart
@@ -297,13 +315,24 @@
         // Age Distribution Chart
         const ageCtx = document.getElementById('ageChart').getContext('2d');
         const ageLabels = /*[[${ageRangeLabels}]]*/;
+        const ageValues = /*[[${ageRangeValues}]]*/;
+
+        // Generate random colors for each bar
+        const backgroundColors = ageValues.map(() => `#${Math.floor(Math.random() * 16777215).toString(16)}`);
+        const hoverBackgroundColors = backgroundColors.map(color => {
+            // Generate a slightly darker color for hover
+            let colorInt = parseInt(color.slice(1), 16);
+            colorInt = colorInt & 0xfefefe >> 1;
+            return `#${colorInt.toString(16).padStart(6, '0')}`;
+        });
+
         const ageData = {
             labels: ageLabels,
             datasets: [{
                 label: 'Number of People',
-                data: /*[[${ageRangeValues}]]*/,
-                backgroundColor: '#FFCE56',
-                hoverBackgroundColor: '#FFCE56'
+                data: ageValues,
+                backgroundColor: backgroundColors,
+                hoverBackgroundColor: hoverBackgroundColors,
             }]
         };
         const ageChart = new Chart(ageCtx, {
@@ -318,6 +347,22 @@
                     title: {
                         display: true,
                         text: 'Age Distribution of Vaccinated People'
+                    },
+                    datalabels: {
+
+                        color: function(context) {
+                            return context.data.backgroundColor;
+                        },
+                        font: function(context) {
+                            const w = context.chart.width;
+                            return {
+                                size: w < 512 ? 12 : 14,
+                                weight: 'bold',
+                            };
+                        },
+                        formatter: function(value, context) {
+                            return context.chart.data.labels[context.dataIndex];
+                        }
                     }
                 },
                 scales: {
@@ -347,101 +392,319 @@
         });
 
 
+    });
 
-        // Nationality Distribution Chart
-        const nationalityCtx = document.getElementById('nationalityChart').getContext('2d');
-        const nationalityLabels = /*[[${nationalityLabels}]]*/;
-        const nationalityValues =/*[[${nationalityValues}]]*/;
-        const nationalityData = {
-            labels: nationalityLabels,
-            datasets: [{
-                label: 'Number of People',
-                data: /*[[${nationalityValues}]]*/,
-                backgroundColor: '#4BC0C0',
-                hoverBackgroundColor: '#4BC0C0'
-            }]
-        };
-        const nationalityChart = new Chart(nationalityCtx, {
-            type: 'bar',
-            data: nationalityData,
-            options: {
-                responsive: true,
-                plugins: {
-                    legend: {
-                        display: false
-                    },
-                    title: {
-                        display: true,
-                        text: 'Nationality Distribution of Vaccinated People'
-                    }
-                },
-                scales: {
-                    x: {
-                        title: {
-                            display: true,
-                            text: 'Nationality'
-                        }
-                    },
-                    y: {
-                        title: {
-                            display: true,
-                            text: 'Number of People'
-                        },
-                        beginAtZero: true,
-                        ticks: {
-                            stepSize: 1,
-                            callback: function(value) {
-                                if (Number.isInteger(value)) {
-                                    return value;
-                                }
-                            }
-                        }
-                    }
-                }
-            },
-        });
 
-        // Nationality Distribution Map
+
+
+    document.addEventListener('DOMContentLoaded', function() {
+        // Injecting Thymeleaf variables into JavaScript
+        const nationalityLabels = /*[[${nationalityLabels}]]*/ [];
+        const nationalityValues = /*[[${nationalityValues}]]*/ [];
+
+
+        // Debug: Log the injected data
+        console.log('Nationality Labels:', nationalityLabels);
+        console.log('Nationality Values:', nationalityValues);
+
         const mapCtx = document.getElementById('nationalityMap').getContext('2d');
-        const mapData = {
-            labels: nationalityLabels,
-            datasets: [{
-                label: 'Nationality Distribution',
-                data: nationalityLabels.map((label, index) => ({
-                    feature: { type: 'Feature', properties: { name: label }, geometry: {} }, // This needs to be updated with actual geo data
-                    value: nationalityValues[index]
-                }))
-            }]
-        };
-        fetch('https://raw.githubusercontent.com/sgratzl/chartjs-chart-geo/master/samples/world.geo.json')
+
+        fetch('https://unpkg.com/world-atlas/countries-50m.json')
             .then((r) => r.json())
-            .then((geojson) => {
+            .then((data) => {
+                const countries = ChartGeo.topojson.feature(data, data.objects.countries).features;
+                console.log('Countries:', countries);
+
+                // Create a mapping of country names if necessary
+                const countryNameMap = {
+                    "Zimbabwe": "zimbabwean",
+                    "Zambia": "zambian",
+                    "Yemen": "yemenite",
+                    "Vietnam": "vietnamese",
+                    "Venezuela": "venezuelan",
+                    "Vatican": "vatican",
+                    "Vanuatu": "vanuatu",
+                    "Uzbekistan": "uzbekistani",
+                    "Uruguay": "uruguayan",
+                    "Micronesia": "micronesian",
+                    "Marshall Is.": "marshallese",
+                    "N. Mariana Is.": "northern mariana islands",
+                    "U.S. Virgin Is.": "u.s. virgin islands",
+                    "Guam": "guam",
+                    "American Samoa": "american samoan",
+                    "Puerto Rico": "puerto rican",
+                    "United States of America": "american",
+                    "S. Geo. and the Is.": "south georgia and the south sandwich islands",
+                    "Br. Indian Ocean Ter.": "british indian ocean territory",
+                    "Saint Helena": "saint helenian",
+                    "Pitcairn Is.": "pitcairn islander",
+                    "Anguilla": "anguillan",
+                    "Falkland Is.": "falkland islander",
+                    "Cayman Is.": "caymanian",
+                    "Bermuda": "bermudian",
+                    "British Virgin Is.": "british virgin islands",
+                    "Turks and Caicos Is.": "turks and caicos islander",
+                    "Montserrat": "montserratian",
+                    "Jersey": "jersey",
+                    "Guernsey": "guernsey",
+                    "Isle of Man": "isle of man",
+                    "United Kingdom": "british",
+                    "United Arab Emirates": "emirian",
+                    "Ukraine": "ukrainian",
+                    "Uganda": "ugandan",
+                    "Turkmenistan": "turkmen",
+                    "Turkey": "turkish",
+                    "Tunisia": "tunisian",
+                    "Trinidad and Tobago": "trinidadian and tobagonian",
+                    "Tonga": "tongan",
+                    "Togo": "togolese",
+                    "Timor-Leste": "east timorese",
+                    "Thailand": "thai",
+                    "Tanzania": "tanzanian",
+                    "Tajikistan": "tajik",
+                    "Taiwan": "taiwanese",
+                    "Syria": "syrian",
+                    "Switzerland": "swiss",
+                    "Sweden": "swedish",
+                    "eSwatini": "swazi",
+                    "Suriname": "surinamer",
+                    "S. Sudan": "south sudanese",
+                    "Sudan": "sudanese",
+                    "Sri Lanka": "sri lankan",
+                    "Spain": "spanish",
+                    "South Korea": "south korean",
+                    "South Africa": "south african",
+                    "Somalia": "somali",
+                    "Somaliland": "somaliland",
+                    "Solomon Is.": "solomon islander",
+                    "Slovakia": "slovakian",
+                    "Slovenia": "slovenian",
+                    "Singapore": "singaporean",
+                    "Sierra Leone": "sierra leonean",
+                    "Seychelles": "seychellois",
+                    "Serbia": "serbian",
+                    "Senegal": "senegalese",
+                    "Saudi Arabia": "saudi",
+                    "São Tomé and Principe": "sao tomean",
+                    "San Marino": "san marinese",
+                    "Samoa": "samoan",
+                    "St. Vin. and Gren.": "saint vincentian",
+                    "Saint Lucia": "saint lucian",
+                    "St. Kitts and Nevis": "saint kitts and nevis",
+                    "Rwanda": "rwandan",
+                    "Russia": "russian",
+                    "Romania": "romanian",
+                    "Qatar": "qatari",
+                    "Portugal": "portuguese",
+                    "Poland": "polish",
+                    "Philippines": "filipino",
+                    "Peru": "peruvian",
+                    "Paraguay": "paraguayan",
+                    "Papua New Guinea": "papua new guinean",
+                    "Panama": "panamanian",
+                    "Palau": "palauan",
+                    "Pakistan": "pakistani",
+                    "Oman": "omani",
+                    "Norway": "norwegian",
+                    "North Korea": "north korean",
+                    "Nigeria": "nigerian",
+                    "Niger": "nigerien",
+                    "Nicaragua": "nicaraguan",
+                    "New Zealand": "new zealander",
+                    "Niue": "niuean",
+                    "Cook Is.": "cook islands",
+                    "Netherlands": "dutch",
+                    "Aruba": "aruban",
+                    "Curaçao": "curacao",
+                    "Nepal": "nepalese",
+                    "Nauru": "nauruan",
+                    "Namibia": "namibian",
+                    "Mozambique": "mozambican",
+                    "Morocco": "moroccan",
+                    "W. Sahara": "western saharan",
+                    "Montenegro": "montenegrin",
+                    "Mongolia": "mongolian",
+                    "Moldova": "moldovan",
+                    "Monaco": "monacan",
+                    "Mexico": "mexican",
+                    "Mauritius": "mauritian",
+                    "Mauritania": "mauritanian",
+                    "Malta": "maltese",
+                    "Mali": "malian",
+                    "Maldives": "maldivan",
+                    "Malaysia": "malaysian",
+                    "Malawi": "malawian",
+                    "Madagascar": "malagasy",
+                    "Macedonia": "macedonian",
+                    "Luxembourg": "luxembourger",
+                    "Lithuania": "lithuanian",
+                    "Liechtenstein": "liechtensteiner",
+                    "Libya": "libyan",
+                    "Liberia": "liberian",
+                    "Lesotho": "basotho",
+                    "Lebanon": "lebanese",
+                    "Latvia": "latvian",
+                    "Laos": "laotian",
+                    "Kyrgyzstan": "kyrgyz",
+                    "Kuwait": "kuwaiti",
+                    "Kosovo": "kosovar",
+                    "Kiribati": "i-kiribati",
+                    "Kenya": "kenyan",
+                    "Kazakhstan": "kazakhstani",
+                    "Jordan": "jordanian",
+                    "Japan": "japanese",
+                    "Jamaica": "jamaican",
+                    "Italy": "italian",
+                    "Israel": "israeli",
+                    "Palestine": "palestinian",
+                    "Ireland": "irish",
+                    "Iraq": "iraqi",
+                    "Iran": "iranian",
+                    "Indonesia": "indonesian",
+                    "India": "indian",
+                    "Iceland": "icelander",
+                    "Hungary": "hungarian",
+                    "Honduras": "honduran",
+                    "Haiti": "haitian",
+                    "Guyana": "guyanese",
+                    "Guinea-Bissau": "guinea-bissauan",
+                    "Guinea": "guinean",
+                    "Guatemala": "guatemalan",
+                    "Grenada": "grenadian",
+                    "Greece": "greek",
+                    "Ghana": "ghanaian",
+                    "Germany": "german",
+                    "Georgia": "georgian",
+                    "Gambia": "gambian",
+                    "Gabon": "gabonese",
+                    "France": "french",
+                    "St. Pierre and Miquelon": "st pierre and miquelon",
+                    "Wallis and Futuna Is.": "wallis and futuna",
+                    "St-Martin": "saint-martin",
+                    "St-Barthélemy": "saint barthelemy",
+                    "Fr. Polynesia": "french polynesian",
+                    "New Caledonia": "new caledonian",
+                    "Fr. S. Antarctic Lands": "french southern and antarctic lands",
+                    "Åland": "aland islands",
+                    "Finland": "finnish",
+                    "Fiji": "fijian",
+                    "Ethiopia": "ethiopian",
+                    "Estonia": "estonian",
+                    "Eritrea": "eritrean",
+                    "Eq. Guinea": "equatorial guinean",
+                    "El Salvador": "salvadoran",
+                    "Egypt": "egyptian",
+                    "Ecuador": "ecuadorean",
+                    "Dominican Rep.": "dominican",
+                    "Dominica": "dominican",
+                    "Djibouti": "djibouti",
+                    "Greenland": "greenlander",
+                    "Faeroe Is.": "faroe islander",
+                    "Denmark": "danish",
+                    "Czechia": "czech",
+                    "N. Cyprus": "northern cypriot",
+                    "Cyprus": "cypriot",
+                    "Cuba": "cuban",
+                    "Croatia": "croatian",
+                    "Côte d'Ivoire": "ivorian",
+                    "Costa Rica": "costa rican",
+                    "Dem. Rep. Congo": "congolese",
+                    "Congo": "congolese",
+                    "Comoros": "comoran",
+                    "Colombia": "colombian",
+                    "China": "chinese",
+                    "Macao": "macanese",
+                    "Hong Kong": "hong konger",
+                    "Chile": "chilean",
+                    "Chad": "chadian",
+                    "Central African Rep.": "central african",
+                    "Cabo Verde": "cape verdean",
+                    "Canada": "canadian",
+                    "Cameroon": "cameroonian",
+                    "Cambodia": "cambodian",
+                    "Myanmar": "burmese",
+                    "Burundi": "burundian",
+                    "Burkina Faso": "burkinabe",
+                    "Bulgaria": "bulgarian",
+                    "Brunei": "bruneian",
+                    "Brazil": "brazilian",
+                    "Botswana": "batswana",
+                    "Bosnia and Herz.": "bosnian",
+                    "Bolivia": "bolivian",
+                    "Bhutan": "bhutanese",
+                    "Benin": "beninese",
+                    "Belize": "belizean",
+                    "Belgium": "belgian",
+                    "Belarus": "belarusian",
+                    "Barbados": "barbadian",
+                    "Bangladesh": "bangladeshi",
+                    "Bahrain": "bahraini",
+                    "Bahamas": "bahamian",
+                    "Azerbaijan": "azerbaijani",
+                    "Austria": "austrian",
+                    "Australia": "australian",
+                    "Indian Ocean Ter.": "indian ocean territory",
+                    "Heard I. and McDonald Is.": "heard island and mcdonald islands",
+                    "Norfolk Island": "norfolk islander",
+                    "Ashmore and Cartier Is.": "ashmore and cartier islands",
+                    "Armenia": "armenian",
+                    "Argentina": "argentinean",
+                    "Antigua and Barb.": "antiguan and barbudan",
+                    "Angola": "angolan",
+                    "Andorra": "andorran",
+                    "Algeria": "algerian",
+                    "Albania": "albanian",
+                    "Afghanistan": "afghan",
+                    "Siachen Glacier": "siachen glacier",
+                    "Antarctica": "antarctic",
+                    "Sint Maarten": "sint maarten"
+                };
+
+                const countryData = countries.map(country => {
+                    let countryName = country.properties.name;
+                    if (countryNameMap[countryName]) {
+                        countryName = countryNameMap[countryName];
+                    }
+                    const nationalityIndex = nationalityLabels.findIndex(label => label.toLowerCase() === countryName.toLowerCase());
+                    const value = nationalityIndex >= 0 ? nationalityValues[nationalityIndex] : 0;
+                    console.log('Country:', country.properties.name, 'Mapped Name:', countryName, 'Value:', value);
+                    return {
+                        feature: country,
+                        value: value
+                    };
+                });
+
+
                 new Chart(mapCtx, {
                     type: 'choropleth',
                     data: {
-                        labels: nationalityLabels,
+                        labels: countries.map(country => country.properties.name),
                         datasets: [{
+                            hoverBackgroundColor: "blue",
+                            outline: countries,
                             label: 'Nationality Distribution',
-                            outline: geojson,
-                            data: nationalityValues.map((value, index) => ({
-                                feature: geojson.features.find(f => f.properties.name === nationalityLabels[index]),
-                                value: value
-                            }))
+                            data: countryData,
+                            borderColor: 'rgb(59,140,225)',
                         }]
                     },
                     options: {
                         showOutline: true,
                         showGraticule: true,
-                        legend: {
-                            display: false
+                        plugins: {
+                            legend: {
+                                display: true
+                            }
                         },
-                        scale: {
-                            projection: 'equalEarth'
+                        scales: {
+                            xy: {
+                                projection: 'equalEarth'
+                            }
                         }
                     }
                 });
             });
     });
+
 
 
     /*]]>*/

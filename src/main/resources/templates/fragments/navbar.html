@@ -99,6 +99,14 @@
             <span th:text="${userSession.getUser().getFullName()}">Full Name</span>
           </a>
         </div>
+
+        <!-- Logout button that is displayed to all the pages and only when the user is logged in (th:if="${userSession.isLoggedIn()}"). -->
+        <li class="nav-item d-lg-block ml-lg-4">
+          <a href="/logout" rel="noopener" class="btn btn-neutral btn-icon">
+            <span class="btn-inner--icon"><i class="fa fa-sign-out-alt mr-2"></i></span>
+            <span class="nav-link-inner--text">Logout</span>
+          </a>
+        </li>
       </ul>
     </div>
   </div>

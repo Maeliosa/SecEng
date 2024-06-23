@@ -58,3 +58,44 @@
 }
 
 /* Forum page */
+
+
+
+/* Stats page */
+
+.metric{
+    font-size: 48px;
+    font-weight: bold;
+    color: aliceblue;
+}
+
+.metric.p{
+    font-size: 22px;
+    color: lightyellow;
+    font-weight: unset;
+}
+
+
+.card-container {
+    margin-bottom: 20px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr); /* Three equal-width columns */
+}
+
+.card-metric {
+    margin: 15px;
+    padding: 28px;
+    border-radius: 22px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    text-align: center;
+}
+
+.card-metric:nth-child(1){
+    background-color: #6aabef;
+}
+.card-metric:nth-child(2){
+    background-color: #998b9a;
+}
+.card-metric:nth-child(3){
+    background-color: #554217;
+}
