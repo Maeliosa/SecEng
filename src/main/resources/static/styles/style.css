@@ -69,7 +69,7 @@
     color: aliceblue;
 }
 
-.metric.p{
+.card-metric p{
     font-size: 22px;
     color: lightyellow;
     font-weight: unset;
@@ -97,5 +97,27 @@
     background-color: #998b9a;
 }
 .card-metric:nth-child(3){
-    background-color: #554217;
+    background-color: #dfba68;
+}
+
+#genderChart{
+    width: 50%;
+    height: auto;
+}
+
+
+
+.custom-select-country{
+    height: 43px;
+}
+
+.country-button{
+    margin-bottom: 29px;
+}
+
+.fa-male, .fa-female{
+    font-size: 49px;
+    margin-right: 200px;
+    margin-top: -29px;
+    color: aliceblue;
 }

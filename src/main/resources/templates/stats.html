@@ -24,7 +24,7 @@ https://www.npmjs.com/package/chartjs-chart-geo
 
                 <h2 th:text="${totalDoses} + ' doses have been administered'"></h2>
                 <form action="stats" method="post">
-                    <select name="nationality">
+                    <select name="nationality" class="custom-select-country">
                         <option value="">Nationality</option>
                         <option value="afghan">Afghan</option>
                         <option value="albanian">Albanian</option>
@@ -219,7 +219,7 @@ https://www.npmjs.com/package/chartjs-chart-geo
                         <option value="zambian">Zambian</option>
                         <option value="zimbabwean">Zimbabwean</option>
                     </select>
-                    <button type="submit" class="btn btn-primary mt-4">
+                    <button type="submit" class="btn btn-primary mt-4 country-button">
                         <span class="btn-inner--icon"><i class="fa fa-user-plus mr-2"></i></span>
                         Submit
                     </button>
@@ -232,29 +232,28 @@ https://www.npmjs.com/package/chartjs-chart-geo
                             <div class="card-metric">
                                 <div class="metric" th:text="${maleDosePercent} + '%'"></div>
                                 <p>of vaccinated people are male</p>
+                                <i class="fas fa-male"></i>
                             </div>
                                 <div class="card-metric">
                                     <div class="metric"  th:text="${femaleDosePercent} + '%'"></div>
                                     <p>of vaccinated people are female</p>
+                                    <i class="fas fa-female"></i>
                                 </div>
                         </div>
 
 
                 <!-- Gender Distribution Chart -->
-                <h3 class="mt-5">Gender Distribution</h3>
-                <canvas id="genderChart"></canvas>
+                <h3 class="mt-5">Gender Distribution of Vaccinated People</h3>
+                <div class="gender-chart"><canvas id="genderChart"></canvas></div>
 
                 <!-- Age Distribution Chart -->
-                <h3 class="mt-5">Age Distribution</h3>
+                <h3 class="mt-5">Age Distribution of Vaccinated People</h3>
                 <canvas id="ageChart"></canvas>
 
                 <!-- Nationality Distribution Chart -->
-                <h3 class="mt-5">Nationality Distribution</h3>
+                <h3 class="mt-5">Nationality Distribution of Vaccinated People</h3>
                 <canvas id="nationalityMap"></canvas>
 
-                <div>
-                    <canvas id="myChart"></canvas>
-                </div>
             </div>
         </div>
     </div>
