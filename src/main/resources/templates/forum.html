@@ -6,7 +6,8 @@
 <body class="index-page">
   <div th:replace="fragments/navbar:: navbar"></div>
 
-
+  <!-- CSRF token is automatically included by Thymeleaf -->
+  <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
   <div class="wrapper">
     <div class="section section-shaped bg-secondary">
       <div class="navbar-background"></div>

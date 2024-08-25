@@ -13,23 +13,26 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
+import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+import service.vaxapp.MFAService;
 import service.vaxapp.UserSession;
 import service.vaxapp.model.*;
 import service.vaxapp.repository.*;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.validation.Valid;
 import java.util.*;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 @Controller
@@ -67,6 +70,19 @@ public class AppController {
     @Autowired
     private AppointmentSlotGenerating AppointmentSlotGenerating;
 
+    @Autowired
+    private MFAService mfaService;
+
+    @Autowired
+    private PasswordEncoder ppsEncoder;
+
+    @Autowired
+    private MyUserDetailsService.ValidationService validationService;
+
+    @Autowired
+    private SecureYamlHandler yamlHandler;
+
+
 
 
     @GetMapping("/")
@@ -74,7 +90,7 @@ public class AppController {
         /**
          * Generate slots if they don't exist. Initially the date and time slot was written
          * manually into the database(appointment_slot). This was not feasible for long term. Therefore,
-         * the appointmentSlotGenerating.java provide a dynamically class to creates new slot
+         * the appointmentSlotGenerating.java provide a dynamically class to creates at runtime, new slot
          * for the next 7 days and time slot with 15 mins interval.
          */
         List<VaccineCentre> centres = vaccineCentreRepository.findAll();
@@ -139,6 +155,9 @@ public class AppController {
         return "redirect:/profile";
     }
 
+
+    /*******Statistics Area**********/
+
     @GetMapping("/stats")
     public String statistics(Model model) {
         // Populate the model with statistics for the default country (Irish in this case)
@@ -178,7 +197,7 @@ public class AppController {
         long male = users_vaccinated_unique.stream().filter(x -> x.getGender().equalsIgnoreCase("male")).count();
         long female = total - male;
 
-        // Create a map to store age ranges and their corresponding percentages
+        // Create a map to store age ranges and their corresponding percentages for age chart
         Map<String, Double> ageRanges = new TreeMap<>();
         ageRanges.put("18-25", calculateAgeRangePercentage("18-25", total, users_vaccinated_unique));
         ageRanges.put("26-35", calculateAgeRangePercentage("26-35", total, users_vaccinated_unique));
@@ -202,6 +221,7 @@ public class AppController {
         model.addAttribute("maleDosePercent", df.format(malePercentage));
         model.addAttribute("femaleDosePercent", df.format(femalePercentage));
 
+        // Debug: used to verify if the variable are rendering and being passed to stats.html
         logger.info("Total Doses: {}", vaccineRepository.count());
         logger.info("Doses by Nationality: {}", dosesByNationality);
         logger.info("Male Percentage: {}", male * 100.0 / (double) total);
@@ -294,19 +314,48 @@ public class AppController {
         return "login";
     }
 
+
     @PostMapping("/login")
     public String login(@RequestParam("email") String email, @RequestParam("pps") String pps,
-                        RedirectAttributes redirectAttributes) {
+                        @RequestParam(value = "otp", required = false) String otp,
+                        RedirectAttributes redirectAttributes, Model model) {
         // Ensure the user is found in the database by PPS and email
-        User user = userRepository.findByCredentials(email, pps);
+        User user = userRepository.findByEmail(email);
         if (user == null) {
-            redirectAttributes.addFlashAttribute("error", "Wrong credentials.");
+            logger.error("Email is not registered.");
+            redirectAttributes.addFlashAttribute("error", "Email is not registered.");
             return "redirect:/login";
         }
+
+        // Check if the provided PPS matches the stored hashed PPS
+        BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
+        if (!passwordEncoder.matches(pps, user.getPPS())) {
+            logger.error("Wrong PPS for {}", user);
+            redirectAttributes.addFlashAttribute("error", "Wrong PPS.");
+            return "redirect:/login";
+        }
+
+
+        // Handle MFA-enabled users
+        if (user.isMfaEnabled()) {
+            if (otp == null || otp.isEmpty()) {
+                logger.error("OTP is required for users with MFA {}", user);
+                redirectAttributes.addFlashAttribute("error", "OTP is required for users with MFA enabled.");
+                return "redirect:/login";
+            }
+            if (!mfaService.validateOtp(user.getMfaSecret(), otp)) {
+                logger.error("Invalid OTP. Please try again. {}", user);
+                redirectAttributes.addFlashAttribute("error", "Invalid OTP. Please try again.");
+                return "redirect:/login";
+            }
+        }
+
         userSession.setUserId(user.getId());
         redirectAttributes.addFlashAttribute("success", "Welcome, " + user.getFullName() + "!");
-        return "redirect:/";
+        return "redirect:/profile";
     }
+
+
 
     @GetMapping("/register")
     public String register(Model model) {
@@ -315,7 +364,7 @@ public class AppController {
     }
 
     @RequestMapping(value = "/register", method = RequestMethod.POST, consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
-    public String register(User user, RedirectAttributes redirectAttributes) {
+    public String register(@Valid @ModelAttribute("user") User user, BindingResult result, RedirectAttributes redirectAttributes, Model model) {
         // Validate user input
         if (user.getDateOfBirth().isEmpty() || user.getEmail().isEmpty() || user.getAddress().isEmpty()
                 || user.getFullName().isEmpty() || user.getGender().isEmpty() || user.getNationality().isEmpty()
@@ -323,6 +372,17 @@ public class AppController {
             redirectAttributes.addFlashAttribute("error", "All fields are required!");
             return "redirect:/register";
         }
+
+        // Sanitize inputs before processing
+        user.setEmail(validationService.sanitizeInput(user.getEmail()));
+        user.setPPS(validationService.sanitizeInput(user.getPPS()));
+
+
+        // Assign a default role if it's not set
+        if (user.getRole() == null) {
+            user.setRole("USER"); // Assign a default role, e.g., ROLE_USER
+        }
+
         if (userRepository.findByPPS(user.getPPS()) != null) {
             redirectAttributes.addFlashAttribute("error", "User with this PPS number already exists.");
             return "redirect:/register";
@@ -336,10 +396,73 @@ public class AppController {
             redirectAttributes.addFlashAttribute("error", "Users under 18 cannot create an account.");
             return "redirect:/register";
         }
+        // Encrypt the password before saving
+        user.setPPS(ppsEncoder.encode(user.getPPS()));
+        user.setMfaEnabled(true);
+        // Save the user in the database
         userRepository.save(user);
-        redirectAttributes.addFlashAttribute("success", "Account created! You can sign in now.");
+
+        // Set the userId in the session
+        userSession.setUserId(user.getId());
+
+        // Generate MFA secret if enabled
+        if (user.isMfaEnabled()) {
+            String secret = mfaService.generateSecret();
+            user.setMfaSecret(secret);
+            userRepository.save(user);  // Save the updated user with MFA secret
+
+            // Generate QR code URL for MFA setup
+            String qrUrl = mfaService.getQrCodeUrl(secret, user.getEmail());
+            model.addAttribute("qrUrl", qrUrl);
+            redirectAttributes.addFlashAttribute("success", "Account created! Please set up MFA.");
+            return "mfasetup";
+        }
+
+        redirectAttributes.addFlashAttribute("success", "Account and MFA setup! Welcome, " + user.getFullName() + "!");
         return "redirect:/login";
     }
+
+    @PostMapping("/verify-mfa")
+    public String verifyMfa(@RequestParam("otp") String otp, RedirectAttributes redirectAttributes, Model model) {
+        User user = userSession.getUser();
+        MFAService mfaService = new MFAService();
+
+        // Ensure that the OTP is numeric
+        if (!otp.matches("\\d+")) {
+            model.addAttribute("qrUrl", mfaService.getQrCodeUrl(user.getMfaSecret(), user.getEmail()));
+            model.addAttribute("error", "Invalid OTP. Please enter a numeric OTP.");
+            return "mfasetup";
+        }
+
+        if (mfaService.validateOtp(user.getMfaSecret(), otp)) {
+            redirectAttributes.addFlashAttribute("success", "MFA setup complete! You are now logged in.");
+            return "redirect:/profile";
+        } else {
+            model.addAttribute("qrUrl", mfaService.getQrCodeUrl(user.getMfaSecret(), user.getEmail()));
+            redirectAttributes.addFlashAttribute("error", "Invalid OTP. Please try again.");
+            return "mfasetup";
+        }
+
+
+    }
+
+    @PostMapping("/enable-mfa")
+    public String enableMfa(RedirectAttributes redirectAttributes, Model model) {
+        User user = userSession.getUser();
+        MFAService mfaService = new MFAService();
+
+        String secret = mfaService.generateSecret();
+        user.setMfaSecret(secret);
+        user.setMfaEnabled(true);
+        userRepository.save(user);
+
+        String qrUrl = mfaService.getQrCodeUrl(secret, user.getEmail());
+        model.addAttribute("qrUrl", qrUrl);
+        System.out.println("QR Code URL: " + qrUrl);
+        return "mfasetup";
+    }
+
+
 
     @GetMapping("/logout")
     public String logout() {
@@ -512,6 +635,17 @@ public class AppController {
             if (!user.isPresent()) {
                 return "404";
             }
+            User currentUser = userSession.getUser();
+            if (currentUser == null) {
+                return "redirect:/login"; // User must be logged in to view a profile
+            }
+
+            // Check if the current user is either viewing their own profile or is an admin
+            if (!currentUser.isAdmin() && !currentUser.getId().equals(user.get().getId())) {
+                // Unauthorized access attempt detected
+                return "404"; // Redirect to an access denied page
+            }
+
 
             List<Vaccine> vaxes = vaccineRepository.findByUser(user.get().getId());
 
@@ -536,6 +670,8 @@ public class AppController {
             return "404";
         }
     }
+
+
 
     @GetMapping("/cancel-appointment/{stringId}")
     public String cancelAppointment(@PathVariable String stringId, RedirectAttributes redirectAttributes) {
@@ -677,6 +813,24 @@ public class AppController {
 
         return "redirect:/profile";
     }
+
+
+    @PostMapping("/upload-yaml")
+    public String uploadYaml(@RequestParam("yamlContent") String yamlContent) {
+        // Validate and parse the YAML content
+        if (!yamlHandler.isValidYaml(yamlContent)) {
+            return "404"; // Show an error page
+        }
+
+        Object parsedData = yamlHandler.parseYaml(yamlContent);
+        if (parsedData == null) {
+            return "404"; // Show an error page
+        }
+
+        // Further processing of the parsed YAML data
+        return "/dashboard"; // Show success page
+    }
+
 
     /**
      * /########################
