@@ -1,6 +1,7 @@
 package service.vaxapp.model;
 
 import javax.persistence.*;
+import javax.validation.constraints.Pattern;
 
 import org.hibernate.annotations.Type;
 
@@ -16,8 +17,10 @@ public class User {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
     @Column(name = "user_pps", unique = true)
+
     private String PPS;
     @Column(name = "full_name")
+
     private String fullName;
     @Column
     private String address;
@@ -141,4 +144,6 @@ public class User {
     public Boolean isAdmin() {
         return admin;
     }
+
+
 }

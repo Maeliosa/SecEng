@@ -14,13 +14,18 @@ public class SecurityConfig {
                 .requiresChannel(channel -> channel.anyRequest().requiresSecure())
                 .csrf(csrf -> csrf.disable())
                 .authorizeRequests(auth -> auth
-                        .requestMatchers().permitAll()
+                        .antMatchers("/public/**", "/login", "/oauth2/**").permitAll()
                         .anyRequest().authenticated()
                 )
 
                 .formLogin(form -> form
                         .loginPage("/login")
                         .permitAll()
+                )
+                .oauth2Login(oauth2Login -> oauth2Login
+                        .loginPage("/login")
+                        .defaultSuccessUrl("/home", true)
+
                 )
                 .logout(logout -> logout
                         .permitAll()
