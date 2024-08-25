@@ -4,6 +4,8 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import service.vaxapp.model.Appointment;
 import service.vaxapp.model.AppointmentSlot;
@@ -23,6 +25,7 @@ import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
 
+
 @SpringBootApplication
 public class VaxApplication {
     public static void main(String[] args) {
@@ -36,9 +39,15 @@ public class VaxApplication {
         return args -> {
             System.out.println("VaxApp started");
 
+
+
             if (userRepo.findAll().size() == 0) {
+
+                // Password encoder
+                PasswordEncoder passwordEncoder = ppsEncoder();
+                
                 // init db
-                final User admin = new User("1234", "John Doe", "The Internet", "", "admin@vaxapp.com", "07/10/1987",
+                final User admin = new User(passwordEncoder.encode("1234"), "John Doe", "The Internet", "", "admin@vaxapp.com","07/10/1987",
                         "Russian", "Male", true);
                 final User dragos = new User("1111", "Dragos George", "Bucharest", "", "dragos@vaxapp.com",
                         "05/06/1999",
@@ -139,5 +148,11 @@ public class VaxApplication {
 
             }
         };
+
+    }
+
+    @Bean
+    public PasswordEncoder ppsEncoder() {
+        return new BCryptPasswordEncoder();
     }
 }

@@ -24,6 +24,8 @@ https://www.npmjs.com/package/chartjs-chart-geo
 
                 <h2 th:text="${totalDoses} + ' doses have been administered'"></h2>
                 <form action="stats" method="post">
+                    <!-- CSRF token is automatically included by Thymeleaf -->
+                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
                     <select name="nationality" class="custom-select-country">
                         <option value="">Nationality</option>
                         <option value="afghan">Afghan</option>
@@ -395,14 +397,14 @@ https://www.npmjs.com/package/chartjs-chart-geo
 
 
 
-
+    // World MAP of the nationality distribution chart
     document.addEventListener('DOMContentLoaded', function() {
-        // Injecting Thymeleaf variables into JavaScript
+
         const nationalityLabels = /*[[${nationalityLabels}]]*/ [];
         const nationalityValues = /*[[${nationalityValues}]]*/ [];
 
 
-        // Debug: Log the injected data
+        // Debug: for troubleshooting the data passing
         console.log('Nationality Labels:', nationalityLabels);
         console.log('Nationality Values:', nationalityValues);
 

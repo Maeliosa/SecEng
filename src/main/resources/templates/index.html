@@ -29,6 +29,8 @@
                             vaccine!</p>
 
                         <form id="appointment-form" class="mt-5 mx-auto" action="make-appointment" method="POST">
+                            <!-- CSRF token is automatically included by Thymeleaf -->
+                            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
                             <span class="text-white">Choose a vaccination center:</span>
                             <select class="form-control mt-1 mb-3 border-0" name="center_id" id="select-center">
                             </select>

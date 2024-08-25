@@ -29,13 +29,15 @@
                                 <h3>Welcome! 👋</h3>
                                 <p>Please register below!</p>
                                 <form role="form" action="/register" method="post">
+                                    <!-- CSRF token is automatically included by Thymeleaf -->
+                                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
                                     <div class="form-group">
                                         <div class="form-group">
                                             <div class="input-group mb-3">
                                                 <div class="input-group-prepend">
                                                     <span class="input-group-text"><i class="fa fa-envelope"></i></span>
                                                 </div>
-                                                <input class="form-control" placeholder="Email" type="email"
+                                                <input class="form-control" id="email" placeholder="Email" type="email"
                                                     name="email" />
                                             </div>
                                         </div>
@@ -44,8 +46,11 @@
                                             <div class="input-group-prepend">
                                                 <span class="input-group-text"><i class="fa fa-user"></i></span>
                                             </div>
-                                            <input class="form-control" placeholder="Full Name" type="text"
-                                                name="fullName" />
+                                            <input class="form-control" placeholder="Full Name"
+                                                   type="text" name="fullName"
+                                                   pattern="^[a-zA-Z\s'-]+$"
+                                                   title="Please enter a valid full name." />
+
                                         </div>
                                     </div>
 
@@ -54,8 +59,8 @@
                                             <div class="input-group-prepend">
                                                 <span class="input-group-text"><i class="fa fa-hashtag"></i></span>
                                             </div>
-                                            <input class="form-control" placeholder="PPS Number" type="text"
-                                                name="PPS" />
+                                            <input class="form-control" id="pps" placeholder="PPS Number" type="text"
+                                                name="PPS" pattern="\d*" maxlength="8" oninput="this.value = this.value.replace(/[^0-9]/g, '');"/>
                                         </div>
                                     </div>
 
@@ -64,8 +69,8 @@
                                             <div class="input-group-prepend">
                                                 <span class="input-group-text"><i class="fa fa-phone"></i></span>
                                             </div>
-                                            <input class="form-control" placeholder="Phone" type="text"
-                                                name="phoneNumber" />
+                                            <input class="form-control" placeholder="Phone" type="text" name="phoneNumber"
+                                                   pattern="[0-9+()\- ]*" title="Please enter a valid phone number." />
                                         </div>
                                     </div>
 
@@ -77,7 +82,9 @@
                                                 </span>
                                             </div>
                                             <input class="form-control" placeholder="Address (City, Country)"
-                                                type="text" name="address" />
+                                                   type="text" name="address"
+                                                   pattern="^[a-zA-Z\s]+,\s*[a-zA-Z\s]+$"
+                                                   title="Please enter the address in the format: City, Country." />
                                         </div>
                                     </div>
 
@@ -345,6 +352,7 @@
 
             $('[data-toggle="tooltip"]').tooltip();
         });
+
     </script>
 </body>
 

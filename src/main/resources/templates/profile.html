@@ -49,6 +49,19 @@
                       Log out
                     </a>
 
+                    <form th:action="@{/enable-mfa}" method="post" class="d-inline-block">
+                      <!-- CSRF token is automatically included by Thymeleaf -->
+                      <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+                      <button type="submit" class="btn btn-primary">
+                      <span class="btn-inner--icon">
+                          <i class="fa-solid fa-key mr-1"></i>
+                      </span>
+                        <span class="btn-inner--text">Enable MFA</span>
+                      </button>
+                    </form>
+
+
+
                     <button
                       th:if="${userSession.isLoggedIn() && userSession.getUser().isAdmin()}"
                       type="button"
@@ -211,6 +224,8 @@
           >
             <div class="modal-dialog">
               <form class="modal-content" action="/assign-vaccine" method="POST" autocomplete="off">
+                <!-- CSRF token is automatically included by Thymeleaf -->
+                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
                 <div class="modal-header">
                   <h5 class="modal-title" id="exampleModalLabel">Assign vaccine</h5>
                   <button type="button" class="close" data-dismiss="modal" aria-label="Close">
