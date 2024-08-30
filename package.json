@@ -10,7 +10,7 @@
     "parcel": "^2.6.2"
   },
   "dependencies": {
-    "@cubejs-client/core": "^0.31.0",
+    "@cubejs-client/core": "^0.35.23",
     "chart.js": "^4.0.0",
     "chartjs-chart-geo": "^4.3.1"
   }
